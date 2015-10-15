@@ -75,6 +75,7 @@ find_package(WebP REQUIRED)
 find_package(OpenGLES2 REQUIRED)
 find_package(EGL REQUIRED)
 find_package(BCMHost REQUIRED)
+find_package(Wayland REQUIRED)
 
 find_package(Libinput REQUIRED)
 find_package(Libudev REQUIRED)
