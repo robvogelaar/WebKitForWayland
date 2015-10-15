@@ -65,6 +65,8 @@ set(WPE_SOURCES
 if (WTF_PLATFORM_BCM_RPI)
     list(APPEND WPE_SOURCES
         Source/ViewBackend/BCMRPi/ViewBackendBCMRPi.cpp
+        Source/ViewBackend/BCMRPi/WaylandDisplay.cpp
+        Source/ViewBackend/BCMRPi/wayland-bcmrpi-dispmanx-protocol.c
     )
 endif ()
 
