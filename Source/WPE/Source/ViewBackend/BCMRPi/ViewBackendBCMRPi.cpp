@@ -30,18 +30,49 @@
 #if WPE_BACKEND(BCM_RPI)
 
 #include "LibinputServer.h"
+#include "WaylandDisplay.h"
+#include "wayland-bcmrpi-dispmanx-client-protocol.h"
+#include <wayland-client.h>
 
 namespace WPE {
 
 namespace ViewBackend {
 
+static const struct wl_bcmrpi_dispmanx_listener g_BCMRPiDispmanxListener = {
+    // element_created
+    [](void* data, struct wl_bcmrpi_dispmanx*, struct wl_surface* surface, uint32_t handle)
+    {
+        auto& elementData = *static_cast<ViewBackendBCMRPi::ElementData*>(data);
+        if (elementData.surface == surface)
+            elementData.handle = handle;
+    }
+};
+
+static const struct wl_callback_listener g_callbackListener = {
+    // frame
+    [](void* data, struct wl_callback* callback, uint32_t)
+    {
+        auto& callbackData = *static_cast<ViewBackendBCMRPi::CallbackListenerData*>(data);
+        if (callbackData.client)
+            callbackData.client->frameComplete();
+        callbackData.frameCallback = nullptr;
+        wl_callback_destroy(callback);
+    },
+};
+
 ViewBackendBCMRPi::ViewBackendBCMRPi()
-    : m_elementHandle(DISPMANX_NO_HANDLE)
+    : m_display(WaylandDisplay::singleton())
     , m_width(0)
     , m_height(0)
 {
-    bcm_host_init();
+    fprintf(stderr, "ViewBackendBCMRPi::ViewBackendBCMRPi()\n");
+    m_elementData.surface = wl_compositor_create_surface(m_display.interfaces().compositor);
+    fprintf(stderr, "\tcreated wl_surface %p\n", m_elementData.surface);
+
+    wl_bcmrpi_dispmanx_add_listener(m_display.interfaces().bcmrpi_dispmanx, &g_BCMRPiDispmanxListener, &m_elementData);
+#if 0
     m_displayHandle = vc_dispmanx_display_open(0);
+#endif
 }
 
 ViewBackendBCMRPi::~ViewBackendBCMRPi()
@@ -51,11 +82,19 @@ ViewBackendBCMRPi::~ViewBackendBCMRPi()
 
 void ViewBackendBCMRPi::setClient(Client* client)
 {
+    m_callbackData.client = client;
     m_client = client;
 }
 
 uint32_t ViewBackendBCMRPi::createBCMElement(int32_t width, int32_t height)
 {
+    fprintf(stderr, "ViewBackendBCMRPi::createBCMElement() (%u,%u)\n", width, height);
+
+    wl_bcmrpi_dispmanx_create_element(m_display.interfaces().bcmrpi_dispmanx, m_elementData.surface, width, height);
+    wl_display_roundtrip(m_display.display());
+    fprintf(stderr, "ViewBackendBCMRPi: handle %u\n", m_elementData.handle);
+
+#if 0
     static VC_DISPMANX_ALPHA_T alpha = {
         static_cast<DISPMANX_FLAGS_ALPHA_T>(DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS),
         255, 0
@@ -79,10 +118,21 @@ uint32_t ViewBackendBCMRPi::createBCMElement(int32_t width, int32_t height)
 
     vc_dispmanx_update_submit_sync(updateHandle);
     return m_elementHandle;
+#endif
+    return m_elementData.handle;
 }
 
 void ViewBackendBCMRPi::commitBCMBuffer(uint32_t elementHandle, uint32_t width, uint32_t height)
 {
+    fprintf(stderr, "ViewBackendBCMRPi::commitBCMBuffer()\n");
+    m_callbackData.frameCallback = wl_surface_frame(m_elementData.surface);
+    wl_callback_add_listener(m_callbackData.frameCallback, &g_callbackListener, &m_callbackData);
+
+    wl_surface_damage(m_elementData.surface, 0, 0, INT32_MAX, INT32_MAX);
+    wl_surface_commit(m_elementData.surface);
+    wl_display_flush(m_display.display());
+
+#if 0
     DISPMANX_UPDATE_HANDLE_T updateHandle = vc_dispmanx_update_start(0);
 
     m_width = width;
@@ -98,11 +148,12 @@ void ViewBackendBCMRPi::commitBCMBuffer(uint32_t elementHandle, uint32_t width, 
 
     if (m_client)
         m_client->frameComplete();
+#endif
 }
 
 void ViewBackendBCMRPi::setInputClient(Input::Client* client)
 {
-    LibinputServer::singleton().setClient(client);
+    // LibinputServer::singleton().setClient(client);
 }
 
 } // namespace ViewBackend

@@ -28,11 +28,14 @@
 
 #include <WPE/ViewBackend/ViewBackend.h>
 
-#include <bcm_host.h>
+struct wl_callback;
+struct wl_surface;
 
 namespace WPE {
 
 namespace ViewBackend {
+
+class WaylandDisplay;
 
 class ViewBackendBCMRPi final : public ViewBackend {
 public:
@@ -45,11 +48,28 @@ public:
 
     void setInputClient(Input::Client*) override;
 
+    struct ElementData {
+        struct wl_surface* surface;
+        uint32_t handle;
+    };
+
+    struct CallbackListenerData {
+        Client* client;
+        struct wl_callback* frameCallback;
+    };
+
 private:
+    const WaylandDisplay& m_display;
+
+    ElementData m_elementData;
+    CallbackListenerData m_callbackData;
+
     Client* m_client;
 
+#if 0
     DISPMANX_DISPLAY_HANDLE_T m_displayHandle;
     DISPMANX_ELEMENT_HANDLE_T m_elementHandle;
+#endif
     uint32_t m_width;
     uint32_t m_height;
 };
